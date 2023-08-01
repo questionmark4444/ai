@@ -11,7 +11,7 @@ float rgb_checker(unsigned char *pixel, unsigned char *testpixel) {
     int x;
     float score_add = 0;
     for (x = 0; x < 3; x++) {
-        if (pixel[x] == testpixel[x]) {
+        if (roundf(pixel[x]/5) == roundf(testpixel[x]/5)) {
             score_add += 1.0 / 3.0;
         }
     }
