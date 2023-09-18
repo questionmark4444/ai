@@ -1,69 +1,99 @@
-from ctypes import *
-import ctypes
-import pandas as pd
-import csv
-
-#c functions
-c_file = "./my_functions.so"
-rgb = CDLL(c_file)
-
-#compare test image with data
-def row_checker(image, testimage):
-    score_add = 0
-    notsaved = bool(0)
-    if notsaved:
-        #compare images
-        newimage = np.array([[rgb.rgb_processor((ctypes.c_int * 3)(*image[x][i])) for i in range(100)] for x in range(100)])
-        newtestimage = np.array([[rgb.rgb_processor((ctypes.c_int * 3)(*testimage[x][i])) for i in range(100)] for x in range(100)])
-        for x in range(100):
-            score_add += rgb.rgb_checker((ctypes.c_int * 100)(*newimage[x]), (ctypes.c_int * 100)(*newtestimage[x]))
-    else:
-        #compare excel files
-        image_array = np.array(image)  # Convert the list to a NumPy array
-        image_uint8 = image_array.astype(np.uint8)
-        score_add = np.sum(np.equal(image_uint8, testimage[:, :, 0]))
-    return score_add
-
-# Importing libraries
-import cv2
-import matplotlib.pyplot as plt
+#libraries
+import tensorflow as tf
+from tensorflow.keras import layers, models
 import numpy as np
-import os
-import PIL
-import time
+import cv2
+import csv
+import ctypes
 
-#if values have been preprocessed and saved in excel files
-saved = bool(1)
-image_number = 5000
-cat = []
-dog = []
-if saved:
-    #open excel files
-    for x in range(image_number):
-        with open('temp/cat' + str(x+1) + '.csv', 'r') as f:
-            cat += [list(csv.reader(f))]
-        with open('temp/dog' + str(x+1) + '.csv', 'r') as f:
-            dog += [list(csv.reader(f))]
-else:
-    #open images
-    cat = [cv2.imread(cv2.samples.findFile("training_set/cats/" + str(x+1) + ".png")) for x in range(image_number)]
-    dog = [cv2.imread(cv2.samples.findFile("training_set/dogs/" + str(x+1) + ".png")) for x in range(image_number)]
-test = cv2.imread(cv2.samples.findFile(input("\nwhere is test image: ")))
 
-x = 0
-catidea = 0
-dogidea = 0
-#compare test image with data
-for x in range(image_number):
-    catidea += row_checker(cat[x], test)
-    dogidea += row_checker(dog[x], test)
-if catidea >= dogidea:
-    print('cat')
-if dogidea >= catidea:
-    print('dog')
-if catidea == dogidea:
-    print("error")
-print('\n')
-print(catidea)
-print('\n')
-print(dogidea)
+tf.config.set_visible_devices([], 'GPU')
+
+
+#input classes
+loop = true
+while loop:  #in case couldnt find excel data
+    class1 = input('what is the first class of image you want to classify')
+    class2 = input('what is the second class of image you want to classify')
+
+    # Load Excel data for training
+    try:
+        class1_data = [np.loadtxt(f'temp/{class1}{x+1}.csv', delimiter=',') for x in range(5000)]
+        class2_data = [np.loadtxt(f'temp/{class2}{x+1}.csv', delimiter=',') for x in range(5000)]
+        loop = false
+    except:
+        print("sorry, couldn't find the saved files")
+
+
+# Import c functions
+c_file = "./my_functions.so"
+rgb = ctypes.CDLL(c_file)
+
+
+# Function to load and preprocess image from file using C library
+def load_and_preprocess_image(file_path):
+    image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)  # Load as grayscale (black and white)
+
+    image = cv2.resize(image, (100, 100))                """each pixel in the loaded image is a list of 3 values, 
+                                                            in grayscale the are made the same, 
+                                                            this will resize and replace the lists with the single values"""
+
+    image = image / 255.0                                # make each value a decimal between 0 and 1 to make comparing easier
+    image = np.expand_dims(image, axis=-1)               # Add a channel dimension
+    image = np.expand_dims(image, axis=0)                # Add a batch dimension
+    return image
+
+
+# Load and preprocess the test image using C library
+loop = true
+while loop:  #in case couldnt find image
+    test_image_path = input("\nWhere is the test image: ")
+    try:
+        test_image = load_and_preprocess_image(test_image_path)
+        loop = false
+    except:
+        print("sorry, couldn't find the image")
+
+# Define the CNN model for grayscale images
+model = models.Sequential()
+
+# Convolutional layer 1
+model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(100, 100, 1)))
+model.add(layers.MaxPooling2D((2, 2)))
+
+# Convolutional layer 2
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.MaxPooling2D((2, 2)))
+
+# Convolutional layer 3
+model.add(layers.Conv2D(128, (3, 3), activation='relu'))
+model.add(layers.MaxPooling2D((2, 2)))
+
+# Flatten the output
+model.add(layers.Flatten())
+
+# Dense layers
+model.add(layers.Dense(128, activation='relu'))
+model.add(layers.Dense(2, activation='softmax'))  # Two output classes: cat and dog
+
+# Compile the model
+model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
+# Convert labels to NumPy array
+train_labels = np.array([0] * len(class1_data) + [1] * len(class2_data))  # 0 for cat, 1 for dog
+
+# Train the model with your cat and dog data
+train_images = np.concatenate([class1_data, class2_data], axis=0)
+model.fit(train_images, train_labels, epochs=10)
+
+# Make predictions on the test image
+predictions = model.predict(test_image)
+
+
+# Classify the test image
+if predictions[0][0] >= predictions[0][1]:
+    print(class1)
+if predictions[0][0] <= predictions[0][1]:
+    print(class2)
+if predictions[0][0] == predictions[0][1]:
+    print('Error')
