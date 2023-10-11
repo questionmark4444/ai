@@ -21,6 +21,8 @@ while loop:    #in case couldnt find excel data
     try:    
         print("")  #new line
         number_of_images = int(input('what number of images of each class do you want to use: '))
+        if (number_of_images < 1):  #restart loop with error
+            print(0/0)
         print("")
         print("(this will look for a folder with the name of that class and png images with ascending number names)")
         class1 = input('what is the first class of image you want to classify: ')
@@ -31,7 +33,7 @@ while loop:    #in case couldnt find excel data
         class2_data = [np.loadtxt(f'temp/{class2}{x+1}.csv', delimiter=',') for x in range(number_of_images)]
         loop = False
     except:
-        print("sorry, couldn't find the saved files, please try again")
+        print("sorry, something went wrong, please try again")
 
 
 # Function to load and preprocess image from file using C library
