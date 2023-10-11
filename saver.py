@@ -29,6 +29,8 @@ while loop:
     try: #in case the images could not be found
         number_images = int(input("number of images of each class: "))
         print("") #new line
+        if (number_of_images < 1):  #restart loop with error
+            print(0/0)
         print("what is the first class of images")
         print("(this will look for a folder with the name of that class and png images with ascending number names)")
         class1 = input(" : ")
@@ -59,6 +61,6 @@ while loop:
         print(f"this took {minutes} minutes")  #print amount of minutes it took with 2 decimal places
         loop = False
     except:
-        print("sorry could not find images of that class")
-        print("(please write the name of the folder correctly and name the images correctly)")
+        print("sorry something went wrong")
+        print("(please write the names of the folders correctly and name the images correctly)")
         print("\n")
