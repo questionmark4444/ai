@@ -1,7 +1,5 @@
-#libraries
-from ctypes import *
-import ctypes
 import csv
+import ctypes
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,58 +7,84 @@ import os
 import PIL
 import time
 
+# Function to load and preprocess image from file using C library
+def load_and_preprocess_image(file_path):
+    image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+    image = cv2.resize(image, (100, 100))
+    image = image / 255.0
+    image = np.expand_dims(image, axis=-1)
+    image = np.expand_dims(image, axis=0)
+    return image
 
-#variable to record how long this will take to load c functions
+def load_images_in_batches(image_folder, Class, batch_size):
+  """Loads the images in a batch from the specified folder.
+
+  Args:
+    image_folder: The path to the folder containing the images.
+    batch_size: The number of images to load in each batch.
+
+  Returns:
+    A NumPy array containing the images in the batch.
+  """
+
+  image_paths = os.listdir(image_folder)
+  image_paths.sort()
+
+  for i in range(batch_size):
+    image_path = os.path.join(image_folder, image_paths[i])
+    processed_image = load_and_preprocess_image(image_path)
+    write_processed_data_to_disk(processed_image, f"temp/{Class}{i + 1}.csv")
+
+def write_processed_data_to_disk(processed_data, output_file):
+  """Writes the processed data to a CSV file.
+
+  Args:
+    processed_data: A NumPy array containing the processed data.
+    output_file: The path to the CSV file to write the processed data to.
+  """
+
+  with open(output_file, "w") as f:
+    writer = csv.writer(f)
+    for row in processed_data:
+      writer.writerow(row)
+
+# Variable to record how long this will take to load C functions
 RecordStart1 = time.time()
 
-
-#import c functions
+# Import C functions
 c_file = "./my_functions.so"
-rgb = CDLL(c_file)
+rgb = ctypes.CDLL(c_file)
 
-
-#other variable to record how long this will take to load c functions
+# Other variable to record how long this will take to load C functions
 Recordend1 = time.time() - RecordStart1
 
-
-#input classes and number of images from user
+# Input classes and number of images from the user
 loop = True
 while loop:
-    try: #in case the images could not be found
-        number_images = int(input("number of images of each class: "))
-        print("") #new line
-        if (number_of_images < 1):  #restart loop with error
-            print(0/0)
-        print("what is the first class of images")
-        print("(this will look for a folder with the name of that class and png images with ascending number names)")
-        class1 = input(" : ")
-        class2 = input("what is the second class of images: ")
-        print("") #new line
+  #try:
+    # Get the class folder names
+    class1 = input("Enter the name of the first class folder: ")
+    class2 = input("Enter the name of the second class folder: ")
 
-        #variable to record how long this will take to load and process images
-        RecordStart2 = time.time()
+    # Get the number of images in each class folder (smaller number)
+    number_images = min(len(os.listdir("training_set/" + class1)), len(os.listdir("training_set/" + class2)))
 
-        #import images
-        class1_data = [cv2.imread(cv2.samples.findFile(f"training_set/{class1}/{x+1}.png")) for x in range(number_images)]
-        class2_data = [cv2.imread(cv2.samples.findFile(f"training_set/{class2}/{x+1}.png")) for x in range(number_images)]
+    if number_images < 1:
+      print(0/0)
 
-        #process data
-        newclass1_data = [[[rgb.rgb_processor((ctypes.c_int * 3)(*class1_data[y][x][i])) for i in range(100)] for x in range(100)] for y in range(number_images)]
-        newclass2_data = [[[rgb.rgb_processor((ctypes.c_int * 3)(*class2_data[y][x][i])) for i in range(100)] for x in range(100)] for y in range(number_images)]
+    # Variable to record how long this will take to load and process images
+    RecordStart2 = time.time()
 
-        #save data in excel files
-        for x in range(number_images):
-            with open((f'temp/{class1}{x+1}.csv'), 'w') as f:
-                csv.writer(f).writerows(newclass1_data[x])
-            with open((f'temp/{class2}{x+1}.csv'), 'w') as f:
-                csv.writer(f).writerows(newclass2_data[x])
+    # process and save images from the class folders
+    load_images_in_batches("training_set/" + class1, class1, number_images)
+    load_images_in_batches("training_set/" + class2, class2, number_images)
 
-        #other variable to record how long this will take to load and process images
-        Recordend2 = time.time() - RecordStart2
-        minutes = int((Recordend1 + Recordend2) / 60 * 100) / 100
-        print(f"this took {minutes} minutes")  #print amount of minutes it took with 2 decimal places
-        loop = False
-    except:
-        print("sorry something went wrong")
-        print("(please write the names of the folders correctly and name the images correctly)")
-        print("\n")
+    # Other variable to record how long this will take to load and process images
+    Recordend2 = time.time() - RecordStart2
+    minutes = int((Recordend1 + Recordend2) / 60 * 100) / 100
+    print(f"the smaller number of images one folder is {number_images}")
+    print(f"This took {minutes} minutes")  # Print the amount of minutes it took with 2 decimal places
+    loop = False
+  #except:
+  #  print("Sorry, something went wrong.")
+  #  print("Please make sure you provide valid folder names and that images are named correctly.\n")
